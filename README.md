@@ -1,1 +1,4 @@
-# Ethereum_Sharding_Method
+# Etherscan_Crawler
+
+本科毕业设计《以太坊分片模型研究》源码，爬取 Etherscan.io 的以太坊历史数据后，若按照地址分片在并行化的星型架构的理论模型下，分析各分片数量时可以达到的系统吞吐量。
+

@@ -3,35 +3,36 @@ import json
 
 class ManageShardTxns():
 	"""管理每种分片情况下，各分片的片内交易数和发起的跨片交易数"""
-	def __init__(self):
-		"""初始化片内交易数与发起的跨片交易数为0"""
-		self.intra_txns = 0
-		self.inter_txns = 0
+	def __init__(self, N):
+		"""初始化该分片向各分片发起交易数为0"""
+		self.txns = [0] * N
 
 	def get_total_txns(self):
 		"""获取该分片发起的所有交易数"""
-		return self.intra_txns + self.inter_txns
+		return sum(self.txns)
 
-	def get_intra_epsilon(self):
-		"""获得发起片内交易占发起交易的比例"""
-		return float(self.intra_txns) / self.get_total_txns()
-
-	def get_inter_epsilon(self):
-		"""获得发起跨片交易占发起交易的比例"""
-		return float(self.inter_txns) / self.get_total_txns()
+	def get_epsilon(self):
+		"""获得向每个分片发起交易占发起交易的比例"""
+		if self.get_total_txns() == 0:
+			return self.txns
+		epsilon = []
+		total_txns = self.get_total_txns()
+		for i in self.txns:
+			epsilon.append(float(i) / total_txns)
+		return epsilon
 
 class ManageTxns():
 	"""依据前n位分片"""
 	def __init__(self, n):
-		self.shardnum = 2 ** n
+		self.N = 2**n
 		self.list_shard = []
-		for i in range(self.shardnum):
-			self.list_shard.append(ManageShardTxns())
+		for i in range(self.N):
+			self.list_shard.append(ManageShardTxns(self.N))
 
 	def get_txns_num(self):
 		"""获得所有交易数"""
 		txns_num = 0
-		for i in range(self.shardnum):
+		for i in range(self.N):
 			txns_num += self.list_shard[i].get_total_txns()
 		return txns_num
 
@@ -85,10 +86,7 @@ def analyse_etherscan(n, manage_txns, c, last_blockid, blocknum=10000):
 		sender_shardid = bin2int(sender_nbits)
 		receiver_shardid = bin2int(receiver_nbits)
 		#print("Sender's shard_id: {} -> Receiver's shard_id: {}".format(sender_shardid, receiver_shardid))
-		if sender_shardid == receiver_shardid:
-			manage_txns.list_shard[sender_shardid].intra_txns += 1
-		else:
-			manage_txns.list_shard[sender_shardid].inter_txns += 1
+		manage_txns.list_shard[sender_shardid].txns[receiver_shardid] += 1
 
 if __name__ == '__main__':
 	#打开数据库
@@ -96,24 +94,24 @@ if __name__ == '__main__':
 	print("Opened database successfully")
 	c = conn.cursor()
 	#获得数据库中最后一个区块号
-	latest_blockid = get_latest_blockid(c)
-	print("The latest block_id is: {}".format(latest_blockid))
+	# latest_blockid = get_latest_blockid(c)
+	# print("The latest block_id is: {}".format(latest_blockid))
 	#获得数据库中最早的区块号
-	earliest_blockid = get_earliest_blockid(c)
-	print("The earliest block_id is: {}".format(earliest_blockid))
+	# earliest_blockid = get_earliest_blockid(c)
+	# print("The earliest block_id is: {}".format(earliest_blockid))
 
-	#计算6600001-6900000共计30w个区块，分为三个piece
+	#计算6600001-6900000共计30w个区块
 	latest_blockid = 6900000
 	#取不同长度位的分片方法
-	for n in range(1, 12):
-		filename = '{}_bits.json'.format(n)
+	for n in range(1, 5):
+		filename = '{}_bits_v3.json'.format(n)
 		#列表：同一长度位的分片方法的多组数据
-		list_manage_pieces = {}
+		dict_manage_pieces = {}
 
-		blocknum = 100000
-		for p in range(3):
+		blocknum = 300000
+		for p in range(1):
 			#管理一种长度位的分片方法的一组数据的结果
-			list_manage_shards = {}
+			dict_manage_shards = {}
 			manage_txns = ManageTxns(n)
 			end_blockid = latest_blockid-p*blocknum
 			analyse_etherscan(n, manage_txns, c, end_blockid, blocknum)
@@ -125,18 +123,18 @@ if __name__ == '__main__':
 				#print("Shard_id: {}'s Epsilon(i, i) is {}".format(i, manage_txns.list_shard[i].get_intra_epsilon()))
 				#print("Shard_id: {}'s Epsilon(j, i) is {}".format(i, manage_txns.list_shard[i].get_inter_epsilon()))
 				#print("Shard_id: {}'s Theta(i) is {}".format(i, manage_txns.get_theta(i)))
-				list_manage_shards['shard_'+str(i)] = {\
-				'intra_epsilon': manage_txns.list_shard[i].get_intra_epsilon(),
-				'inter_epsilon': manage_txns.list_shard[i].get_inter_epsilon(),
-				'theta': manage_txns.get_theta(i)}
+				dict_manage_shards['shard_'+str(i)] = {\
+				'theta': manage_txns.get_theta(i),
+				'epsilon': manage_txns.list_shard[i].get_epsilon()
+				}
 
-			list_manage_pieces['piece_'+str(p)] = list_manage_shards
+			dict_manage_pieces['piece_'+str(p)] = dict_manage_shards
 		
 		print('\n')
-		print(list_manage_pieces)
+		print(dict_manage_pieces)
 		print('\n')
 
 		with open(filename, 'w') as f_json:
-			json.dump(list_manage_pieces, f_json)
+			json.dump(dict_manage_pieces, f_json)
 
 	conn.close()
