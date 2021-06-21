@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS']
+
 def get_value_polynomial_2(n, coef1, coef2, coef3):
 	#秦九韶算法求多项式值
 	return (coef1 * n + coef2) * n + coef3
@@ -9,7 +11,7 @@ def get_root(alpha, beta, gamma, start, end):
 	left = float(start)
 	right = float(end)
 	error = 1e-5
-	
+
 	while True:
 		mid = (left + right) / 2
 		value = get_value_polynomial_2(mid, gamma, -(alpha+beta+gamma), (alpha+beta-1))
@@ -36,16 +38,23 @@ def get_theoretical_tps(x, N_threshold, alpha, beta, gamma):
 	return y
 
 if __name__ == '__main__':
-	#选择数量级差异：1，2，3
+	#选择数量级差异：0，1，2，3
 	gamma_flag = 3
 	#选择是否展开局部图：0，1
-	expand_flag = 1
+	expand_flag = 0
 
 	alpha = 1
 	beta = 1
 
 	#绘制不同数量级下的TPS
-	if gamma_flag == 1:
+	if gamma_flag == 0:
+		gamma = 1
+		N_threshold = get_root(alpha, beta, gamma, 0, 100)
+		print(N_threshold)
+		x = [2**i for i in range(1, 8)]
+		fs = 10
+		title = r"$\alpha$=1, $\beta$=1, $\gamma$=10$^{-1}$"
+	elif gamma_flag == 1:
 		gamma = 1e-1
 		N_threshold = get_root(alpha, beta, gamma, 0, 100)
 		x = [2**i for i in range(1, 8)]
@@ -63,11 +72,14 @@ if __name__ == '__main__':
 		x = [2**i for i in range(1, 16)]
 		fs = 4
 		title = r"$\alpha$=1, $\beta$=1, $\gamma$=10$^{-3}$"
-	y = get_theoretical_tps(x)
+	y = get_theoretical_tps(x, N_threshold, alpha, beta, gamma)
+
+	print(x)
+	print(y)
 
 	plt.figure(dpi=100, figsize=(10, 6))
 	plt.grid()
-	
+
 	#需要放大的部分
 	if expand_flag == 0:
 		plt.plot(x, y, c='red', linewidth=1)
@@ -81,17 +93,17 @@ if __name__ == '__main__':
 		elif gamma_flag == 3:
 			x_expand = x[10:]
 			y_expand = y[10:]
-		
+
 		plt.plot(x_expand, y_expand, c='red', linewidth=1)
 		plt.scatter(x_expand, y_expand, c='red', edgecolor='none', s=40)
 		for a, b in zip(x_expand, y_expand):
 			plt.text(a, b, (a, round(b, 1)), ha='left', va='bottom', fontsize=12)
-	
+
 	#x轴以对数显示
 	if gamma_flag > 1 and expand_flag == 0:
 		plt.xscale('log')
 
-	plt.title(title, fontsize=24)
-	plt.xlabel("Shard number", fontsize=14)
-	plt.ylabel("TPS growth rate", fontsize=14)
+	plt.title(title, fontsize=14)
+	plt.xlabel("分片数量", fontsize=14)
+	plt.ylabel("通量增长率", fontsize=14)
 	plt.show()
